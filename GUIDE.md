@@ -40,8 +40,9 @@ local Enabled = Section:Toggle({
 
 ## สร้างหน้าและ Section
 
-- `Window:Page({Name="Main", Icon="Home"})`
-- `Window:Page({Name="Visuals", Icon="Eye"})`
+- `Window:Page({Name="Main"})`
+- `Window:Page({Name="Visuals"})`
+- ปุ่มแท็บแสดงข้อความล้วน และขยายความกว้างตามข้อความพร้อมระยะขอบด้านละ 14 px
 - `Page:Section({Name="General", Side="Left", Description="Optional"})`
 - `Page:Section({Name="Other", Side="Right"})`
 - `Page:Select()` สลับไปหน้านั้น
