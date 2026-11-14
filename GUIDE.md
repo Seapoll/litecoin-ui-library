@@ -90,7 +90,9 @@ Window:SetToggleKey(Enum.KeyCode.F10)
 print(Window:GetToggleKey())
 ```
 
-ในหน้า Settings ให้คลิกปุ่มชื่อคีย์แล้วกดปุ่มใหม่ คีย์ UI มีสิทธิเหนือ keybind ของ toggle ที่ใช้ปุ่มเดียวกัน ขณะพิมพ์ใน TextBox จะไม่ซ่อน UI มีปุ่ม Reset to RightShift ให้คืนค่าเริ่มต้น
+ในหน้า Settings มีแถว `Ui keybind` ด้านล่างของแผงขวา ให้คลิกช่องสีขาวแล้วกดปุ่มใหม่ คีย์ UI มีสิทธิเหนือ keybind ของ toggle ที่ใช้ปุ่มเดียวกัน ขณะพิมพ์ใน TextBox จะไม่ซ่อน UI
+
+Transparent ใช้แผงกระจกสีเทาโปร่งใส ขอบบาง และข้อความสีขาว
 
 ```lua
 Window:SetScale(0.9)
