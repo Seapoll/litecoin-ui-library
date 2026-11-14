@@ -134,8 +134,8 @@ local function toggle(parent,id,name,y,initial,callback)
  local c={Button=b,KeyButton=badge,Key=nil,Mode="Toggle",Check=check}
  function c.Set(v)
   api.State[id]=not not v
-  animate(b,{BackgroundColor3=v and Color3.fromRGB(74,156,246) or Color3.fromRGB(233,237,243)})
-  animate(border,{Color=v and Color3.fromRGB(60,140,230) or Color3.fromRGB(211,217,226)})
+  animate(b,{BackgroundColor3=v and Color3.fromRGB(53,94,155) or Color3.fromRGB(233,237,243)})
+  animate(border,{Color=v and Color3.fromRGB(53,94,155) or Color3.fromRGB(211,217,226)})
   check.Visible=not not v
   if callback then callback(not not v) end
  end
