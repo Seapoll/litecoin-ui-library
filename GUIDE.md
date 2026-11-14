@@ -84,15 +84,16 @@ Label ใช้ `Label:Set("New text")`; Button ใช้ `Button:Fire()` เพ
 สร้างหน้าตั้งค่าธีมและปุ่มซ่อน/แสดง UI ด้วย:
 
 ```lua
-Window:AddSettingsPage() -- Theme: White / Dark / Transparent และปุ่มตั้ง UI key
-Window:SetTheme("Dark")
+Window:AddSettingsPage() -- Theme: Clear / Tinted / Matte และปุ่มตั้ง UI key
+Window:SetTheme("Tinted")
 Window:SetToggleKey(Enum.KeyCode.F10)
 print(Window:GetToggleKey())
 ```
 
 ในหน้า Settings มีแถว `Ui keybind` ด้านล่างของแผงขวา ให้คลิกช่องสีขาวแล้วกดปุ่มใหม่ คีย์ UI มีสิทธิเหนือ keybind ของ toggle ที่ใช้ปุ่มเดียวกัน ขณะพิมพ์ใน TextBox จะไม่ซ่อน UI
 
-Transparent ใช้แผงกระจกสีเทาโปร่งใส ขอบบาง และข้อความสีขาว
+Clear / Tinted / Matte ใช้ค่าสี ความโปร่งใส ขอบ และ gradient ตาม material preset ที่กำหนดไว้ แผงมีมุมโค้งและระยะเผื่อเส้นขอบเพื่อไม่ให้ถูกตัด
+`Window:GetThemeDefinition()` คืนสำเนา preset ปัจจุบันให้ตรวจหรืออ้างอิงได้
 
 ```lua
 Window:SetScale(0.9)
