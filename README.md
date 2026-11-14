@@ -1,6 +1,6 @@
 # Litecoin UI Library
 
-A reusable Roblox client UI library based on the supplied design. Includes FC Minimal Bold, two columns, pages and sections, pink checkboxes, sliders, dropdowns, text inputs, buttons, and configurable Hold/Toggle keybinds.
+A reusable Roblox client UI library based on the supplied design. Includes FC Minimal Bold, Clear / Tinted / Matte materials, rounded two-column panels, pages and sections, blue checkboxes, sliders, dropdowns, text inputs, buttons, and configurable Hold/Toggle keybinds.
 
 ## เปิด UI ตัวอย่าง
 
