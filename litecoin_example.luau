@@ -66,9 +66,12 @@ local Extra = Window:Page({Name = "Custom"})
 Extra:Toggle({Name = "My function", Keybind = Enum.KeyCode.F7, Mode = "Hold",
     Callback = function(held) print("Custom function:", held) end})
 
+Window:AddSettingsPage()
+
 getgenv().LitecoinDemo = {
     Window = Window, Main = Main, General = General,
     Enabled = Enabled, Strength = Strength, Mode = Mode,
     Message = Message, Status = Status,
 }
 return Window
+
