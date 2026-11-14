@@ -15,6 +15,10 @@ local Http=game:GetService("HttpService")
 local env=getgenv and getgenv() or _G
 env.LitecoinLibraryWindows=env.LitecoinLibraryWindows or {}
 if env.LitecoinLibraryWindows[Config.Name] then env.LitecoinLibraryWindows[Config.Name].Destroy() end
+local playerGui=Players.LocalPlayer:WaitForChild("PlayerGui")
+for _,old in ipairs(playerGui:GetChildren()) do
+ if old.Name==Config.Name and old:IsA("ScreenGui") and old:GetAttribute("LitecoinLibrary") then old:Destroy() end
+end
 local White=Color3.fromRGB(255,255,255)
 local Gray=Color3.fromRGB(233,233,233)
 local Black=Color3.fromRGB(9,9,9)
@@ -32,8 +36,37 @@ end)
 local connections,tweens={},{}
 local api={Controls={},State={Animations=true},PageObjects={},FontLoaded=fontLoaded,Config=Config}
 local dead=false
+local jobs,resources={},{}
+local function later(delay,fn)
+ if dead then return nil end
+ local function run()
+  local thread=coroutine.running()
+  if not dead then
+   local ok,err=pcall(fn)
+   if not ok then api.LastError=tostring(err) warn("[Litecoin UI] "..tostring(err)) end
+  end
+  jobs[thread]=nil
+ end
+ local thread
+ if delay==nil then thread=task.defer(run) else thread=task.delay(delay,run) end
+ jobs[thread]=true return thread
+end
+local function dispose(resource)
+ local kind=typeof(resource)
+ if kind=="RBXScriptConnection" then resource:Disconnect()
+ elseif kind=="Instance" then resource:Destroy()
+ elseif kind=="thread" then if resource~=coroutine.running() and coroutine.status(resource)~="dead" then task.cancel(resource) end
+ elseif type(resource)=="function" then resource()
+ else error("Unsupported cleanup resource") end
+end
+function api:Track(resource)
+ if dead then pcall(dispose,resource) else table.insert(resources,resource) end
+ return resource
+end
+function api:Spawn(fn) assert(type(fn)=="function") return later(nil,fn) end
+function api:Delay(seconds,fn) assert(type(fn)=="function" and seconds>=0) return later(seconds,fn) end
 local tickAsset=getcustomasset("litecoin_tick_white.png")
-local function on(signal,fn) local c=signal:Connect(fn) table.insert(connections,c) return c end
+local function on(signal,fn) assert(not dead,"Window was destroyed") local c=signal:Connect(fn) table.insert(connections,c) return c end
 local function make(class,props,parent) local o=Instance.new(class) for k,v in pairs(props) do o[k]=v end o.Parent=parent return o end
 local function corners(o,r) make("UICorner",{CornerRadius=UDim.new(0,r)},o) end
 local function frame(parent,name,x,y,w,h,bg,r,class)
@@ -45,6 +78,7 @@ local function label(parent,name,value,x,y,w,h,size,color,bold)
  return o
 end
 local function animate(o,props,time)
+ if dead then return nil end
  if tweens[o] then tweens[o]:Cancel() end
  local t=Tween:Create(o,TweenInfo.new(time or Config.HoverTime,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),props)
  tweens[o]=t t:Play() return t
@@ -60,6 +94,7 @@ local function button(parent,name,value,x,y,w,h,hover)
 end
 local gui=make("ScreenGui",{Name=Config.Name,ResetOnSpawn=false,IgnoreGuiInset=true,DisplayOrder=140,ZIndexBehavior=Enum.ZIndexBehavior.Sibling},Players.LocalPlayer:WaitForChild("PlayerGui"))
 api.Gui=gui
+gui:SetAttribute("LitecoinLibrary",true)
 local root=frame(gui,"Window",0,0,780,510,Color3.fromRGB(217,217,217),10,"CanvasGroup")
 root.GroupTransparency=1
 root.AnchorPoint=Vector2.new(0.5,0.5) root.Position=UDim2.fromScale(0.5,0.5)
@@ -107,7 +142,7 @@ local function setBindingMenu(open)
  else
   animate(bindMenu,{GroupTransparency=1},0.16)
   animate(menuScale,{Scale=0.97},0.16)
-  task.delay(0.16,function() if not dead and menuGeneration==token then bindMenu.Visible=false end end)
+  later(0.16,function() if menuGeneration==token then bindMenu.Visible=false end end)
  end
 end
 api.SetBindingMenuVisible=setBindingMenu
@@ -256,7 +291,7 @@ function api.SelectTab(name,instant)
   for n,p in pairs(pages) do p.Visible=n==name p.GroupTransparency=0 end return
  end
  animate(previous,{GroupTransparency=1},Config.Transition/2)
- task.delay(Config.Transition/2,function()
+ later(Config.Transition/2,function()
   if dead or generation~=token then return end
   for n,p in pairs(pages) do p.Visible=n==name end
   nextPage.GroupTransparency=1 animate(nextPage,{GroupTransparency=0},Config.Transition/2)
@@ -287,9 +322,17 @@ local cameraConnection
 local function watchCamera() if cameraConnection then cameraConnection:Disconnect() end local camera=workspace.CurrentCamera if camera then cameraConnection=on(camera:GetPropertyChangedSignal("ViewportSize"),fit) end fit() end
 on(workspace:GetPropertyChangedSignal("CurrentCamera"),watchCamera)
 function api.Destroy()
- if dead then return end releaseAll() cancelCapture() dead=true generation+=1
+ if dead then return end dead=true api.Destroyed=true generation+=1 menuGeneration+=1
+ releaseAll() cancelCapture()
  for _,c in ipairs(connections) do c:Disconnect() end
+ table.clear(connections)
+ for thread in pairs(jobs) do pcall(dispose,thread) end
+ table.clear(jobs)
  for _,t in pairs(tweens) do t:Cancel() end
+ table.clear(tweens)
+ for i=#resources,1,-1 do local ok,err=pcall(dispose,resources[i]) if not ok then warn("[Litecoin UI cleanup] "..tostring(err)) end end
+ table.clear(resources)
+ if env.LitecoinDemo and env.LitecoinDemo.Window==api then env.LitecoinDemo=nil end
  if env.LitecoinLibraryWindows[Config.Name]==api then env.LitecoinLibraryWindows[Config.Name]=nil end gui:Destroy()
 end
 on(gui.Destroying,function() if not dead then api.Destroy() end end)
@@ -305,7 +348,7 @@ local function dispatch(callback,...)
  if not callback or dead then return end
  assert(type(callback)=="function","Callback must be a function")
  local args=table.pack(...)
- task.spawn(function()
+ later(nil,function()
   local ok,err=pcall(callback,table.unpack(args,1,args.n))
   if not ok then api.LastError=tostring(err) warn("[Litecoin UI] "..tostring(err)) end
  end)
@@ -443,7 +486,7 @@ function api:Get(id) return api.State[id] end
 api.Pages=pages
 env.LitecoinLibraryWindows[Config.Name]=api
 watchCamera()
-task.defer(function() if not dead then animate(root,{GroupTransparency=0},0.3) end end)
+later(nil,function() animate(root,{GroupTransparency=0},0.3) end)
 return api
 end
 Library.Window=Library.CreateWindow
