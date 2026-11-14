@@ -81,6 +81,17 @@ Label ใช้ `Label:Set("New text")`; Button ใช้ `Button:Fire()` เพ
 
 ## Window
 
+สร้างหน้าตั้งค่าธีมและปุ่มซ่อน/แสดง UI ด้วย:
+
+```lua
+Window:AddSettingsPage() -- Theme: White / Dark / Transparent และปุ่มตั้ง UI key
+Window:SetTheme("Dark")
+Window:SetToggleKey(Enum.KeyCode.F10)
+print(Window:GetToggleKey())
+```
+
+ในหน้า Settings ให้คลิกปุ่มชื่อคีย์แล้วกดปุ่มใหม่ คีย์ UI มีสิทธิเหนือ keybind ของ toggle ที่ใช้ปุ่มเดียวกัน ขณะพิมพ์ใน TextBox จะไม่ซ่อน UI มีปุ่ม Reset to RightShift ให้คืนค่าเริ่มต้น
+
 ```lua
 Window:SetScale(0.9)
 Window:SetVisible(false)
