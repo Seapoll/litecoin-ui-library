@@ -60,7 +60,8 @@ local function button(parent,name,value,x,y,w,h,hover)
 end
 local gui=make("ScreenGui",{Name=Config.Name,ResetOnSpawn=false,IgnoreGuiInset=true,DisplayOrder=140,ZIndexBehavior=Enum.ZIndexBehavior.Sibling},Players.LocalPlayer:WaitForChild("PlayerGui"))
 api.Gui=gui
-local root=frame(gui,"Window",0,0,780,510,Color3.fromRGB(217,217,217),10)
+local root=frame(gui,"Window",0,0,780,510,Color3.fromRGB(217,217,217),10,"CanvasGroup")
+root.GroupTransparency=1
 root.AnchorPoint=Vector2.new(0.5,0.5) root.Position=UDim2.fromScale(0.5,0.5)
 local scale=make("UIScale",{Scale=1},root)
 local title=frame(root,"DragHandle",0,0,169,55)
@@ -442,6 +443,7 @@ function api:Get(id) return api.State[id] end
 api.Pages=pages
 env.LitecoinLibraryWindows[Config.Name]=api
 watchCamera()
+task.defer(function() if not dead then animate(root,{GroupTransparency=0},0.3) end end)
 return api
 end
 Library.Window=Library.CreateWindow
