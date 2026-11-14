@@ -88,6 +88,27 @@ Window:SetVisible(true)
 Window:Destroy()
 ```
 
+รันซ้ำด้วย `Id` เดิมจะล้างหน้าต่างเก่าก่อนสร้างใหม่ รวม event connections, tweens, งาน Callback ที่ Library เรียก และงานที่สร้างด้วย `Window:Spawn` / `Window:Delay`
+
+ถ้าฟังก์ชันของคุณสร้าง resource เพิ่มเอง ให้ลงทะเบียนกับ Window เพื่อให้ล้างเมื่อรันซ้ำด้วย:
+
+```lua
+Window:Track(connection) -- RBXScriptConnection
+Window:Track(instance)   -- Instance ที่สร้างเพิ่มนอก UI
+Window:Track(thread)     -- thread ที่สร้างเอง
+Window:Track(function()
+    -- คืนค่า/หยุดฟังก์ชันเพิ่มเติมของคุณตรงนี้ (ไม่ควรรอหรือ yield)
+end)
+Window:Spawn(function()
+    -- งานนี้จะถูกยกเลิกเมื่อ Window ถูกลบ
+end)
+Window:Delay(2, function()
+    -- งานนี้จะไม่ทำงานถ้า Window ถูกลบก่อนครบเวลา
+end)
+```
+
+งานที่คุณสร้างเองด้วย `task.spawn` หรือการเปลี่ยนค่าภายนอก UI ต้องลงทะเบียน `Track` หรือเพิ่ม cleanup function เพื่อให้คืนค่าครบ Library ไม่ล้าง script อื่นที่ไม่ได้เป็นเจ้าของ
+
 `CreateWindow` รองรับ `Name`, `Id`, `ToggleKey`, `Transition` (วินาที), `Accent` (Color3)
 ขนาดพื้นฐาน 780 × 510 ปรับย่ออัตโนมัติให้พอดีหน้าจอ สร้าง Window ด้วย Id เดิมจะปิดตัวเก่าก่อน
 
