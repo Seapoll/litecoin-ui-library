@@ -25,6 +25,13 @@ local Black=Color3.fromRGB(9,9,9)
 local Muted=Color3.fromRGB(120,120,125)
 local Blue=options.Accent or Color3.fromRGB(53,94,155)
 local Line=Color3.fromRGB(230,230,232)
+local themes={
+ White={Window=Color3.fromRGB(217,217,217),Panel=White,Hover=Gray,Text=Black,Muted=Muted,Border=Line,Off=Color3.fromRGB(233,237,243),OffBorder=Color3.fromRGB(211,217,226),PanelAlpha=0,WindowAlpha=0},
+ Dark={Window=Color3.fromRGB(20,22,27),Panel=Color3.fromRGB(30,33,40),Hover=Color3.fromRGB(47,52,63),Text=Color3.fromRGB(239,241,246),Muted=Color3.fromRGB(165,172,187),Border=Color3.fromRGB(65,71,85),Off=Color3.fromRGB(48,54,67),OffBorder=Color3.fromRGB(84,94,113),PanelAlpha=0,WindowAlpha=0},
+ Transparent={Window=Color3.fromRGB(217,217,217),Panel=White,Hover=Gray,Text=Black,Muted=Color3.fromRGB(83,88,99),Border=Color3.fromRGB(193,199,211),Off=Color3.fromRGB(233,237,243),OffBorder=Color3.fromRGB(191,200,216),PanelAlpha=0.30,WindowAlpha=0.55},
+}
+local theme=themes.White
+local paintEntries,animatedProps={},{}
 local font=Font.fromEnum(Enum.Font.GothamBold)
 local fontLoaded=pcall(function()
  writefile("litecoin_fc.font",Http:JSONEncode({name="FC Minimal",faces={
@@ -67,7 +74,24 @@ function api:Spawn(fn) assert(type(fn)=="function") return later(nil,fn) end
 function api:Delay(seconds,fn) assert(type(fn)=="function" and seconds>=0) return later(seconds,fn) end
 local tickAsset=getcustomasset("litecoin_tick_white.png")
 local function on(signal,fn) assert(not dead,"Window was destroyed") local c=signal:Connect(fn) table.insert(connections,c) return c end
-local function make(class,props,parent) local o=Instance.new(class) for k,v in pairs(props) do o[k]=v end o.Parent=parent return o end
+local function make(class,props,parent)
+ local o=Instance.new(class) for k,v in pairs(props) do o[k]=v end
+ for prop,value in pairs(props) do
+  local role
+  if prop=="BackgroundColor3" then
+   if value==White then role="Panel" elseif value==Gray then role="Hover" elseif value==themes.White.Window then role="Window" elseif value==themes.White.Off then role="Off" end
+  elseif prop=="TextColor3" or prop=="PlaceholderColor3" then
+   if value==Black then role="Text" elseif value==Muted then role="Muted" end
+  elseif prop=="Color" and class=="UIStroke" then
+   if value==Line then role="Border" elseif value==themes.White.OffBorder then role="OffBorder" end
+  end
+  if role then
+   table.insert(paintEntries,{Object=o,Property=prop,Role=role}) o[prop]=theme[role]
+   if prop=="BackgroundColor3" and (role=="Panel" or role=="Window") and props.BackgroundTransparency~=1 then o.BackgroundTransparency=role=="Window" and theme.WindowAlpha or theme.PanelAlpha end
+  end
+ end
+ o.Parent=parent return o
+end
 local function corners(o,r) make("UICorner",{CornerRadius=UDim.new(0,r)},o) end
 local function frame(parent,name,x,y,w,h,bg,r,class)
  local o=make(class or "Frame",{Name=name,Position=UDim2.fromOffset(x,y),Size=UDim2.fromOffset(w,h),BorderSizePixel=0,BackgroundColor3=bg or White,BackgroundTransparency=bg and 0 or 1},parent)
@@ -81,14 +105,15 @@ local function animate(o,props,time)
  if dead then return nil end
  if tweens[o] then tweens[o]:Cancel() end
  local t=Tween:Create(o,TweenInfo.new(time or Config.HoverTime,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),props)
+ animatedProps[o]=props
  tweens[o]=t t:Play() return t
 end
 local function button(parent,name,value,x,y,w,h,hover)
  local b=make("TextButton",{Name=name,Text=value,Position=UDim2.fromOffset(x,y),Size=UDim2.fromOffset(w,h),BorderSizePixel=0,BackgroundColor3=White,TextColor3=Black,TextSize=13,FontFace=font,AutoButtonColor=false},parent)
  corners(b,8)
  if hover~=false then
-  on(b.MouseEnter,function() animate(b,{BackgroundColor3=Gray}) end)
-  on(b.MouseLeave,function() animate(b,{BackgroundColor3=White}) end)
+  on(b.MouseEnter,function() animate(b,{BackgroundColor3=theme.Hover}) end)
+  on(b.MouseLeave,function() animate(b,{BackgroundColor3=theme.Panel}) end)
  end
  return b
 end
@@ -113,7 +138,7 @@ make("UIListLayout",{FillDirection=Enum.FillDirection.Horizontal,Padding=UDim.ne
 local tabButtons,pageOrder={},{}
 local hoveredTab
 local function refreshTabs()
- for name,b in pairs(tabButtons) do animate(b,{BackgroundColor3=(api.State.Tab==name or hoveredTab==name) and Gray or White}) end
+ for name,b in pairs(tabButtons) do animate(b,{BackgroundColor3=(api.State.Tab==name or hoveredTab==name) and theme.Hover or theme.Panel}) end
 end
 local content=frame(root,"Content",5,55,770,450)
 content.ClipsDescendants=true
@@ -125,6 +150,7 @@ local function section(parent,name,x,y,w,h,description)
  return f
 end
 local bindings,pendingBind,heldKeys={},{},{}
+local pendingUIKey,uiKeyBadge
 pendingBind=nil
 local bindMenu=frame(gui,"BindingMenu",0,0,168,116,White,8,"CanvasGroup")
 bindMenu.Visible=false bindMenu.ZIndex=220
@@ -158,6 +184,8 @@ local function releaseHeld(c)
 end
 local function cancelCapture()
  if pendingBind then local c=pendingBind pendingBind=nil c.RefreshBinding() end
+ pendingUIKey=nil
+ if uiKeyBadge then uiKeyBadge.Text=Config.ToggleKey.Name end
 end
 local function toggle(parent,id,name,y,initial,callback)
  label(parent,id.."Label",name,16,y,180,30,13)
@@ -170,8 +198,8 @@ local function toggle(parent,id,name,y,initial,callback)
  local c={Button=b,KeyButton=badge,Key=nil,Mode="Toggle",Check=check}
  function c.Set(v)
   api.State[id]=not not v
-  animate(b,{BackgroundColor3=v and Color3.fromRGB(53,94,155) or Color3.fromRGB(233,237,243)})
-  animate(border,{Color=v and Color3.fromRGB(53,94,155) or Color3.fromRGB(211,217,226)})
+  animate(b,{BackgroundColor3=v and Color3.fromRGB(53,94,155) or theme.Off})
+  animate(border,{Color=v and Color3.fromRGB(53,94,155) or theme.OffBorder})
   check.Visible=not not v
   if callback then callback(not not v) end
  end
@@ -217,9 +245,11 @@ on(UIS.InputBegan,function(i)
 end)
 function api.KeyDown(key,processed,focused)
  if heldKeys[key] then return true end heldKeys[key]=true
+ if pendingUIKey then pendingUIKey=nil api:SetToggleKey(key) return true end
  if pendingBind then local c=pendingBind pendingBind=nil c.Bind(key) return true end
  -- Explicit bindings may share Roblox shortcuts; typing in a text box takes priority.
  if focused then return false end
+ if key==Config.ToggleKey then return "UI" end
  local used=false
  for _,c in pairs(bindings) do if c.Key==key then
   used=true
@@ -314,6 +344,7 @@ on(UIS.InputBegan,function(i,processed)
  if i.UserInputType~=Enum.UserInputType.Keyboard or i.KeyCode==Enum.KeyCode.Unknown then return end
  local focused=UIS:GetFocusedTextBox()~=nil
  local used=api.KeyDown(i.KeyCode,processed,focused)
+ if used=="UI" then root.Visible=not root.Visible closeDropdown() setBindingMenu(false) cancelCapture() return end
  if used or processed or focused then return end
  if i.KeyCode==Config.ToggleKey then root.Visible=not root.Visible closeDropdown() setBindingMenu(false) cancelCapture() end
  if i.KeyCode==Enum.KeyCode.Escape then closeDropdown() setBindingMenu(false) end
@@ -330,6 +361,7 @@ function api.Destroy()
  table.clear(jobs)
  for _,t in pairs(tweens) do t:Cancel() end
  table.clear(tweens)
+ table.clear(animatedProps) table.clear(paintEntries)
  for i=#resources,1,-1 do local ok,err=pcall(dispose,resources[i]) if not ok then warn("[Litecoin UI cleanup] "..tostring(err)) end end
  table.clear(resources)
  if env.LitecoinDemo and env.LitecoinDemo.Window==api then env.LitecoinDemo=nil end
@@ -482,6 +514,52 @@ end
 function api:SetScale(value) assert(type(value)=="number" and value>0) uiScale=value fit() return self end
 function api:SetVisible(value) root.Visible=not not value closeDropdown() setBindingMenu(false) return self end
 function api:Get(id) return api.State[id] end
+function api:SetTheme(name)
+ assert(not dead,"Window was destroyed") assert(themes[name],"Theme must be White, Dark or Transparent")
+ theme=themes[name] api.State.Theme=name
+ for _,entry in ipairs(paintEntries) do
+  local o=entry.Object
+  if o.Parent then
+   local props=animatedProps[o]
+   if tweens[o] and props and (props.BackgroundColor3 or props.TextColor3 or props.Color) then tweens[o]:Cancel() end
+   o[entry.Property]=theme[entry.Role]
+   if entry.Property=="BackgroundColor3" and (entry.Role=="Panel" or entry.Role=="Window") and o.BackgroundTransparency<0.999 then
+    o.BackgroundTransparency=entry.Role=="Window" and theme.WindowAlpha or theme.PanelAlpha
+   end
+  end
+ end
+ for id,c in pairs(bindings) do c.Set(api.State[id],true) end
+ refreshTabs()
+ if self.SettingsThemeControl and self.SettingsThemeControl:Get()~=name then self.SettingsThemeControl:Set(name,true) end
+ return self
+end
+function api:SetToggleKey(key)
+ assert(typeof(key)=="EnumItem" and key.EnumType==Enum.KeyCode and key~=Enum.KeyCode.Unknown,"Expected keyboard KeyCode")
+ Config.ToggleKey=key api.State.UIKey=key.Name
+ if uiKeyBadge then uiKeyBadge.Text=key.Name end
+ return self
+end
+function api:GetToggleKey() return Config.ToggleKey end
+function api:CaptureUIKey()
+ cancelCapture() pendingUIKey=true
+ if uiKeyBadge then uiKeyBadge.Text="Press any key…" end
+end
+function api:AddSettingsPage(opts)
+ if self.SettingsPage then return self.SettingsPage end
+ opts=opts or {}
+ local page=self:Page({Name=opts.Name or "Settings"})
+ local appearance=page:Section({Name="Theme",Side="Left",Description="Choose the appearance of your interface"})
+ self.SettingsThemeControl=appearance:Dropdown({Name="Theme",Options={"White","Dark","Transparent"},Default=api.State.Theme or "White",Callback=function(value) self:SetTheme(value) end})
+ appearance:Label({Text="Transparent makes the window and panels translucent.",Height=50})
+ local input=page:Section({Name="UI keybind",Side="Right",Description="Choose a key to show or hide this window"})
+ local key=input:Button({Name=Config.ToggleKey.Name,Callback=function() self:CaptureUIKey() end})
+ uiKeyBadge=key.Instance self.SettingsKeyControl=key
+ input:Label({Text="Click the key button, then press a keyboard key. The UI key takes priority if a toggle uses the same key.",Height=70})
+ input:Button({Name="Reset to RightShift",Callback=function() cancelCapture() self:SetToggleKey(Enum.KeyCode.RightShift) end})
+ self.SettingsPage=page
+ self:SetTheme(api.State.Theme or "White") self:SetToggleKey(Config.ToggleKey)
+ return page
+end
 
 api.Pages=pages
 env.LitecoinLibraryWindows[Config.Name]=api
