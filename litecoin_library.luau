@@ -25,12 +25,24 @@ local Black=Color3.fromRGB(9,9,9)
 local Muted=Color3.fromRGB(120,120,125)
 local Blue=options.Accent or Color3.fromRGB(53,94,155)
 local Line=Color3.fromRGB(230,230,232)
-local themes={
- White={Window=Color3.fromRGB(217,217,217),Panel=White,Hover=Gray,Text=Black,Muted=Muted,Border=Line,Off=Color3.fromRGB(233,237,243),OffBorder=Color3.fromRGB(211,217,226),PanelAlpha=0,WindowAlpha=0},
- Dark={Window=Color3.fromRGB(20,22,27),Panel=Color3.fromRGB(30,33,40),Hover=Color3.fromRGB(47,52,63),Text=Color3.fromRGB(239,241,246),Muted=Color3.fromRGB(165,172,187),Border=Color3.fromRGB(65,71,85),Off=Color3.fromRGB(48,54,67),OffBorder=Color3.fromRGB(84,94,113),PanelAlpha=0,WindowAlpha=0},
- Transparent={Window=Color3.fromRGB(114,111,118),Panel=Color3.fromRGB(170,168,177),Hover=Color3.fromRGB(199,197,207),Text=Color3.fromRGB(250,249,253),Muted=Color3.fromRGB(216,213,225),Border=Color3.fromRGB(222,219,232),Off=Color3.fromRGB(133,132,145),OffBorder=Color3.fromRGB(194,192,209),PanelAlpha=0.75,WindowAlpha=0.50},
+local materials={
+ Clear={Window={White,0.78},WindowStroke=0.2,BodyGradient=true,Sheen=false,StrokeGradient=true,
+  Card={White,0.85},CardStroke=0.65,CardGradient=true,Input={White,0.88},InputStroke=0.82,
+  Code={Color3.fromRGB(10,12,18),0.45},Button={White,0.88,White,0.75},TintButton={0.55,0.35},Row={White,0.92,White,0.84},SelectedRow=0.7},
+ Tinted={Window={Color3.fromRGB(15,18,25),0.32},WindowStroke=0.2,BodyGradient=false,Sheen=true,StrokeGradient=true,
+  Card={Color3.fromRGB(25,30,42),0.5},CardStroke=0.72,CardGradient=true,Input={White,0.9},InputStroke=0.82,
+  Code={Color3.fromRGB(8,10,14),0.35},Button={White,0.9,White,0.8},TintButton={0.5,0.3},Row={White,0.94,White,0.88},SelectedRow=0.65},
+ Matte={Window={Color3.fromRGB(10,10,12),0},WindowStroke=0.86,BodyGradient=false,Sheen=false,StrokeGradient=false,
+  Card={Color3.fromRGB(19,19,22),0},CardStroke=0.93,CardGradient=false,Input={Color3.fromRGB(28,28,33),0},InputStroke=0.92,
+  Code={Color3.fromRGB(6,6,8),0},Button={Color3.fromRGB(32,32,38),0,Color3.fromRGB(46,46,54),0},TintButton={0.3,0.12},Row={Color3.fromRGB(26,26,31),0,Color3.fromRGB(38,38,45),0},SelectedRow=0.55},
 }
-local theme=themes.White
+local themes={}
+for name,m in pairs(materials) do themes[name]={Window=m.Window[1],WindowAlpha=m.Window[2],Panel=m.Card[1],PanelAlpha=m.Card[2],Hover=m.Row[3],Text=White,Muted=Color3.fromRGB(202,204,213),Border=White,Off=m.Input[1],OffBorder=White} end
+local theme=themes.Clear
+local material=materials.Clear
+local surfaces={}
+local surface,applySurface
+
 local paintEntries,animatedProps={},{}
 local font=Font.fromEnum(Enum.Font.GothamBold)
 local fontLoaded=pcall(function()
@@ -75,15 +87,16 @@ function api:Delay(seconds,fn) assert(type(fn)=="function" and seconds>=0) retur
 local tickAsset=getcustomasset("litecoin_tick_white.png")
 local function on(signal,fn) assert(not dead,"Window was destroyed") local c=signal:Connect(fn) table.insert(connections,c) return c end
 local function make(class,props,parent)
- local o=Instance.new(class) for k,v in pairs(props) do o[k]=v end
+ local existing=class=="UIStroke" and parent and surfaces[parent] and parent:FindFirstChildOfClass("UIStroke")
+ local o=existing or Instance.new(class) for k,v in pairs(props) do o[k]=v end
  for prop,value in pairs(props) do
   local role
   if prop=="BackgroundColor3" then
-   if value==White then role="Panel" elseif value==Gray then role="Hover" elseif value==themes.White.Window then role="Window" elseif value==themes.White.Off then role="Off" end
+   if value==White then role="Panel" elseif value==Gray then role="Hover" elseif value==Color3.fromRGB(217,217,217) then role="Window" elseif value==Color3.fromRGB(233,237,243) then role="Off" end
   elseif prop=="TextColor3" or prop=="PlaceholderColor3" then
    if value==Black then role="Text" elseif value==Muted then role="Muted" end
   elseif prop=="Color" and class=="UIStroke" then
-   if value==Line then role="Border" elseif value==themes.White.OffBorder then role="OffBorder" end
+   if value==Line then role="Border" elseif value==Color3.fromRGB(211,217,226) then role="OffBorder" end
   end
   if role then
    table.insert(paintEntries,{Object=o,Property=prop,Role=role}) o[prop]=theme[role]
@@ -95,7 +108,13 @@ end
 local function corners(o,r) make("UICorner",{CornerRadius=UDim.new(0,r)},o) end
 local function frame(parent,name,x,y,w,h,bg,r,class)
  local o=make(class or "Frame",{Name=name,Position=UDim2.fromOffset(x,y),Size=UDim2.fromOffset(w,h),BorderSizePixel=0,BackgroundColor3=bg or White,BackgroundTransparency=bg and 0 or 1},parent)
- if r then corners(o,r) end return o
+ if r then corners(o,r) end
+ if surface and bg then
+  if name=="Window" then surface(o,"Window")
+  elseif name=="LeftPanel" or name=="RightPanel" or name=="Navigation" or name=="BindingMenu" then surface(o,"Card")
+  elseif name=="Rail" then surface(o,"Input") end
+ end
+ return o
 end
 local function label(parent,name,value,x,y,w,h,size,color,bold)
  local o=make("TextLabel",{Name=name,Text=value,Position=UDim2.fromOffset(x,y),Size=UDim2.fromOffset(w,h),BackgroundTransparency=1,TextColor3=color or Black,TextSize=size or 14,TextXAlignment=Enum.TextXAlignment.Left,FontFace=bold and Font.new(font.Family,Enum.FontWeight.Bold) or font,TextTruncate=Enum.TextTruncate.AtEnd},parent)
@@ -108,12 +127,60 @@ local function animate(o,props,time)
  animatedProps[o]=props
  tweens[o]=t t:Play() return t
 end
+applySurface=function(o,transition)
+ local entry=surfaces[o]
+ if not entry or not o.Parent or o:GetAttribute("FixedTheme") then return end
+ local kind=entry.Kind
+ local m=material
+ local color,alpha,strokeAlpha,gradient
+ if kind=="Window" then color,alpha=m.Window[1],m.Window[2] strokeAlpha=m.WindowStroke gradient=m.BodyGradient or m.Sheen
+ elseif kind=="Card" then color,alpha=m.Card[1],m.Card[2] strokeAlpha=m.CardStroke gradient=m.CardGradient
+ elseif kind=="Input" then color,alpha=m.Input[1],m.Input[2] strokeAlpha=m.InputStroke
+ elseif kind=="Code" then color,alpha=m.Code[1],m.Code[2] strokeAlpha=m.InputStroke
+ elseif kind=="Row" then
+  color=entry.Hovered and m.Row[3] or m.Row[1]
+  alpha=entry.Selected and m.SelectedRow or (entry.Hovered and m.Row[4] or m.Row[2])
+ elseif kind=="Checkbox" then
+  color=entry.Selected and Color3.fromRGB(53,94,155) or m.Input[1]
+  alpha=entry.Selected and (entry.Hovered and m.TintButton[2] or m.TintButton[1]) or m.Input[2]
+  strokeAlpha=m.InputStroke
+ else color=entry.Hovered and m.Button[3] or m.Button[1] alpha=entry.Hovered and m.Button[4] or m.Button[2] strokeAlpha=m.InputStroke end
+ local props=animatedProps[o]
+ if tweens[o] and props and (props.BackgroundColor3 or props.BackgroundTransparency) then tweens[o]:Cancel() end
+ if transition then animate(o,{BackgroundColor3=color,BackgroundTransparency=alpha},0.12)
+ else o.BackgroundColor3=color o.BackgroundTransparency=alpha end
+ if strokeAlpha then
+  local edge=o:FindFirstChildOfClass("UIStroke")
+  if not edge then edge=Instance.new("UIStroke") edge.Name="SurfaceStroke" edge.ApplyStrokeMode=Enum.ApplyStrokeMode.Border edge.Parent=o end
+  edge.Color=White edge.Transparency=strokeAlpha edge.Thickness=kind=="Checkbox" and 0.8 or 1
+  local g=edge:FindFirstChild("StrokeGradient")
+  if not g then g=Instance.new("UIGradient") g.Name="StrokeGradient" g.Rotation=45 g.Transparency=NumberSequence.new({NumberSequenceKeypoint.new(0,0),NumberSequenceKeypoint.new(0.5,0.65),NumberSequenceKeypoint.new(1,0.05)}) g.Parent=edge end
+  g.Enabled=m.StrokeGradient and (kind=="Window" or kind=="Card")
+ end
+ local g=o:FindFirstChild("SurfaceGradient")
+ if gradient and not g then g=Instance.new("UIGradient") g.Name="SurfaceGradient" g.Rotation=90 g.Parent=o end
+ if g then
+  g.Enabled=not not gradient
+  if kind=="Window" and m.Sheen then
+   g.Transparency=NumberSequence.new({NumberSequenceKeypoint.new(0,0),NumberSequenceKeypoint.new(0.18,0.35),NumberSequenceKeypoint.new(1,0.6)})
+  else g.Transparency=NumberSequence.new({NumberSequenceKeypoint.new(0,0),NumberSequenceKeypoint.new(1,0.25)}) end
+ end
+end
+surface=function(o,kind)
+ if not kind then surfaces[o]=nil return end
+ surfaces[o]=surfaces[o] or {}
+ surfaces[o].Kind=kind
+ o:SetAttribute("SurfaceKind",kind)
+ applySurface(o)
+ return o
+end
+
 local function button(parent,name,value,x,y,w,h,hover)
  local b=make("TextButton",{Name=name,Text=value,Position=UDim2.fromOffset(x,y),Size=UDim2.fromOffset(w,h),BorderSizePixel=0,BackgroundColor3=White,TextColor3=Black,TextSize=13,FontFace=font,AutoButtonColor=false},parent)
- corners(b,8)
+ corners(b,8) surface(b,"Button")
  if hover~=false then
-  on(b.MouseEnter,function() animate(b,{BackgroundColor3=theme.Hover}) end)
-  on(b.MouseLeave,function() animate(b,{BackgroundColor3=theme.Panel}) end)
+  on(b.MouseEnter,function() if surfaces[b] then surfaces[b].Hovered=true applySurface(b,true) end end)
+  on(b.MouseLeave,function() if surfaces[b] then surfaces[b].Hovered=false applySurface(b,true) end end)
  end
  return b
 end
@@ -138,13 +205,13 @@ make("UIListLayout",{FillDirection=Enum.FillDirection.Horizontal,Padding=UDim.ne
 local tabButtons,pageOrder={},{}
 local hoveredTab
 local function refreshTabs()
- for name,b in pairs(tabButtons) do animate(b,{BackgroundColor3=(api.State.Tab==name or hoveredTab==name) and theme.Hover or theme.Panel}) end
+ for name,b in pairs(tabButtons) do surface(b,"Row") surfaces[b].Selected=api.State.Tab==name surfaces[b].Hovered=hoveredTab==name applySurface(b) end
 end
 local content=frame(root,"Content",5,55,770,450)
-content.ClipsDescendants=true
+content.ClipsDescendants=false
 local pages={}
 local function section(parent,name,x,y,w,h,description)
- local f=frame(parent,name,x,y,w,h,White,10)
+ local f=frame(parent,name,x,y,w,h,nil,10)
  label(f,"Title",name,16,10,w-32,26,16,Black,true)
  label(f,"Description",description or "",16,36,w-32,24,11,Muted)
  return f
@@ -195,11 +262,13 @@ local function toggle(parent,id,name,y,initial,callback)
  local check=make("ImageLabel",{Name="Check",Position=UDim2.fromOffset(2,2),Size=UDim2.fromOffset(14,14),BackgroundTransparency=1,Image=tickAsset,ImageColor3=White,ScaleType=Enum.ScaleType.Fit},b)
  local badge=button(parent,id.."Key","None",parent.Size.X.Offset-102,y+3,61,24)
  badge.TextSize=11 make("UIStroke",{Color=Line,Thickness=1},badge)
+ surface(b,"Checkbox")
+ on(b.MouseEnter,function() surfaces[b].Hovered=true applySurface(b,true) end)
+ on(b.MouseLeave,function() surfaces[b].Hovered=false applySurface(b,true) end)
  local c={Button=b,KeyButton=badge,Key=nil,Mode="Toggle",Check=check}
  function c.Set(v)
   api.State[id]=not not v
-  animate(b,{BackgroundColor3=v and Color3.fromRGB(53,94,155) or theme.Off})
-  animate(border,{Color=v and Color3.fromRGB(53,94,155) or theme.OffBorder})
+  surfaces[b].Selected=not not v applySurface(b,true)
   check.Visible=not not v
   if callback then callback(not not v) end
  end
@@ -277,13 +346,13 @@ local function dropdown(parent,id,name,y,options,initial,callback)
   mark.Rotation=angle
   table.insert(paintEntries,{Object=mark,Property="BackgroundColor3",Role="Muted"}) mark.BackgroundColor3=theme.Muted
  end
- local list=frame(gui,id.."Options",0,0,300,#options*32+8,White,8)
+ local list=frame(gui,id.."Options",0,0,300,#options*32+8,White,8) surface(list,"Card")
  list.Visible=false list.ZIndex=200
  make("UIStroke",{Color=Line,Thickness=1},list)
  local c={Button=b,List=list,Options={}}
  function c.Set(v) assert(table.find(options,v),"Unknown dropdown value") api.State[id]=v b.Text=v closeDropdown() if callback then callback(v) end end
  for i,v in ipairs(options) do
-  local choice=button(list,"Option"..i,v,4,4+(i-1)*32,292,30) choice.ZIndex=201
+  local choice=button(list,"Option"..i,v,4,4+(i-1)*32,292,30) choice.ZIndex=201 surface(choice,"Row")
   on(choice.MouseButton1Click,function() c.Set(v) end) c.Options[v]=choice
  end
  function c.Open()
@@ -294,13 +363,14 @@ local function dropdown(parent,id,name,y,options,initial,callback)
   for _,choice in pairs(c.Options) do choice.Size=UDim2.new(1,-8,0,30) end
   list.Visible=true openDropdown=list
  end
+ surface(b,"Input")
  on(b.MouseButton1Click,c.Open) c.Set(initial) api.Controls[id]=c return c
 end
 local draggingSlider
 local function slider(parent,id,name,y,initial,callback)
  label(parent,id.."Label",name,16,y,200,24,13)
  local number=label(parent,id.."Value","",parent.Size.X.Offset-60,y,44,24,12,Muted) number.TextXAlignment=Enum.TextXAlignment.Right
- local b=button(parent,id,"",16,y+27,parent.Size.X.Offset-32,22) b.BackgroundTransparency=1
+ local b=button(parent,id,"",16,y+27,parent.Size.X.Offset-32,22) b.BackgroundTransparency=1 surface(b,nil)
  local rail=frame(b,"Rail",0,8,b.Size.X.Offset,5,Gray,3)
  local fill=frame(rail,"Fill",0,0,0,5,Blue,3)
  local knob=frame(rail,"Knob",0,-4,13,13,Blue,7) knob.AnchorPoint=Vector2.new(0.5,0)
@@ -366,7 +436,7 @@ function api.Destroy()
  table.clear(jobs)
  for _,t in pairs(tweens) do t:Cancel() end
  table.clear(tweens)
- table.clear(animatedProps) table.clear(paintEntries)
+ table.clear(animatedProps) table.clear(paintEntries) table.clear(surfaces)
  for i=#resources,1,-1 do local ok,err=pcall(dispose,resources[i]) if not ok then warn("[Litecoin UI cleanup] "..tostring(err)) end end
  table.clear(resources)
  if env.LitecoinDemo and env.LitecoinDemo.Window==api then env.LitecoinDemo=nil end
@@ -413,7 +483,7 @@ function api:Page(options)
  local page={Name=name,Instance=view,Sections={}}
  local columns={}
  for i,side in ipairs({"Left","Right"}) do
-  local background=frame(view,side.."Panel",(i-1)*390,0,380,450,White,8)
+  local background=frame(view,side.."Panel",1+(i-1)*390,1,378,448,White,8)
   local column=make("ScrollingFrame",{Name=side.."Sections",Size=UDim2.fromScale(1,1),BackgroundTransparency=1,BorderSizePixel=0,ScrollBarThickness=3,CanvasSize=UDim2.new(),AutomaticCanvasSize=Enum.AutomaticSize.Y,ScrollingDirection=Enum.ScrollingDirection.Y},background)
   make("UIPadding",{PaddingTop=UDim.new(0,12),PaddingBottom=UDim.new(0,12),PaddingLeft=UDim.new(0,12),PaddingRight=UDim.new(0,12)},column)
   make("UIListLayout",{Padding=UDim.new(0,14),SortOrder=Enum.SortOrder.LayoutOrder},column)
@@ -431,11 +501,11 @@ function api:Page(options)
  function page:Section(opts)
   assert(not dead,"Window was destroyed") opts=opts or {}
   local side=opts.Side or "Left" assert(columns[side],"Side must be Left or Right")
-  local f=section(columns[side],opts.Name or "Section",0,0,356,60,opts.Description)
+  local f=section(columns[side],opts.Name or "Section",0,0,354,60,opts.Description)
   f.LayoutOrder=#self.Sections+1
   local s={Instance=f,Cursor=opts.Description and 68 or 44}
   local function row(height)
-   assert(not dead,"Window was destroyed") local y=s.Cursor s.Cursor+=height+8 f.Size=UDim2.fromOffset(356,s.Cursor+8) return y
+   assert(not dead,"Window was destroyed") local y=s.Cursor s.Cursor+=height+8 f.Size=UDim2.fromOffset(354,s.Cursor+8) return y
   end
   function s:Toggle(o)
    o=o or {} local id=identifier(o)
@@ -487,7 +557,7 @@ function api:Page(options)
    o=o or {} local id=identifier(o) local y=row(61)
    label(f,id.."Label",o.Name or "Text",16,y,324,22,13)
    local input=make("TextBox",{Name=id,Position=UDim2.fromOffset(16,y+25),Size=UDim2.fromOffset(324,32),BackgroundColor3=White,BorderSizePixel=0,Text=tostring(o.Default or ""),PlaceholderText=o.Placeholder or "Type here…",PlaceholderColor3=Muted,TextColor3=Black,TextSize=13,FontFace=font,ClearTextOnFocus=false},f)
-   corners(input,7) make("UIStroke",{Thickness=0.8,Color=Line},input)
+   corners(input,7) surface(input,"Input") make("UIStroke",{Thickness=0.8,Color=Line},input)
    make("UIPadding",{PaddingLeft=UDim.new(0,10)},input)
    local raw={Input=input}
    function raw.Set(v,silent) v=tostring(v) local previous=api.State[id] input.Text=v api.State[id]=v if not silent and previous~=v then dispatch(o.Callback,v) end end
@@ -514,15 +584,15 @@ function api:Page(options)
  end
  api.PageObjects[name]=page
  if not api.State.Tab then api.SelectTab(name,true) end
- if api.State.Theme=="Transparent" then api:SetTheme("Transparent") end
+ if api.State.Theme then api:SetTheme(api.State.Theme) end
  return page
 end
 function api:SetScale(value) assert(type(value)=="number" and value>0) uiScale=value fit() return self end
 function api:SetVisible(value) root.Visible=not not value closeDropdown() setBindingMenu(false) return self end
 function api:Get(id) return api.State[id] end
 function api:SetTheme(name)
- assert(not dead,"Window was destroyed") assert(themes[name],"Theme must be White, Dark or Transparent")
- theme=themes[name] api.State.Theme=name
+ assert(not dead,"Window was destroyed") name=({White="Clear",Dark="Matte",Transparent="Tinted"})[name] or name assert(themes[name],"Theme must be Clear, Tinted or Matte")
+ theme=themes[name] material=materials[name] api.State.Theme=name
  for _,entry in ipairs(paintEntries) do
   local o=entry.Object
   if o.Parent and not o:GetAttribute("FixedTheme") then
@@ -535,13 +605,7 @@ function api:SetTheme(name)
   end
  end
  for id,c in pairs(bindings) do c.Set(api.State[id],true) end
- local glassTargets={root}
- for _,p in pairs(pages) do table.insert(glassTargets,p.LeftPanel) table.insert(glassTargets,p.RightPanel) end
- for _,o in ipairs(glassTargets) do
-  local edge=o:FindFirstChild("GlassOutline")
-  if not edge then edge=make("UIStroke",{Name="GlassOutline",Color=White,Thickness=1,Transparency=0.5,ApplyStrokeMode=Enum.ApplyStrokeMode.Border},o) end
-  edge.Enabled=name=="Transparent"
- end
+ for o in pairs(surfaces) do applySurface(o) end
  refreshTabs()
  if self.SettingsThemeControl and self.SettingsThemeControl:Get()~=name then self.SettingsThemeControl:Set(name,true) end
  return self
@@ -562,7 +626,7 @@ function api:AddSettingsPage(opts)
  opts=opts or {}
  local page=self:Page({Name=opts.Name or "Settings"})
  local appearance=page:Section({Name="Theme",Side="Left",Description="Choose the appearance of your interface"})
- self.SettingsThemeControl=appearance:Dropdown({Name="Theme",Options={"White","Dark","Transparent"},Default=api.State.Theme or "White",Callback=function(value) self:SetTheme(value) end})
+ self.SettingsThemeControl=appearance:Dropdown({Name="Theme",Options={"Clear","Tinted","Matte"},Default=api.State.Theme or "Clear",Callback=function(value) self:SetTheme(value) end})
  local panel=page.Instance.RightPanel
  label(panel,"UIKeyLabel","Ui keybind",8,413,76,28,14)
  local b=button(panel,"UIKey",Config.ToggleKey.Name,84,414,46,26,false)
@@ -574,8 +638,14 @@ function api:AddSettingsPage(opts)
  on(b.MouseButton1Click,function() self:CaptureUIKey() end)
  uiKeyBadge=b self.SettingsKeyControl=key
  self.SettingsPage=page
- self:SetTheme(api.State.Theme or "White") self:SetToggleKey(Config.ToggleKey)
+ self:SetTheme(api.State.Theme or "Clear") self:SetToggleKey(Config.ToggleKey)
  return page
+end
+
+function api:GetTheme() return api.State.Theme or "Clear" end
+function api:GetThemeDefinition(name)
+ local source=assert(materials[name or self:GetTheme()],"Unknown theme")
+ local copy={} for k,v in pairs(source) do copy[k]=type(v)=="table" and table.clone(v) or v end return copy
 end
 
 api.Pages=pages
