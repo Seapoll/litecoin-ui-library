@@ -2,6 +2,8 @@
 
 A reusable Roblox client UI library based on the supplied design. Includes FC Minimal Bold, Clear / Tinted / Matte materials, rounded two-column panels, pages and sections, blue checkboxes, sliders, dropdowns, text inputs, buttons, and configurable Hold/Toggle keybinds.
 
+Version 1.1.0 removes inherited outlines from slider hitboxes and tabs, keeps input padding consistent, and preserves the existing public control API.
+
 ## เปิด UI ตัวอย่าง
 
 ```lua
