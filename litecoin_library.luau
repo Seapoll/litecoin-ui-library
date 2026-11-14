@@ -28,7 +28,7 @@ local Line=Color3.fromRGB(230,230,232)
 local themes={
  White={Window=Color3.fromRGB(217,217,217),Panel=White,Hover=Gray,Text=Black,Muted=Muted,Border=Line,Off=Color3.fromRGB(233,237,243),OffBorder=Color3.fromRGB(211,217,226),PanelAlpha=0,WindowAlpha=0},
  Dark={Window=Color3.fromRGB(20,22,27),Panel=Color3.fromRGB(30,33,40),Hover=Color3.fromRGB(47,52,63),Text=Color3.fromRGB(239,241,246),Muted=Color3.fromRGB(165,172,187),Border=Color3.fromRGB(65,71,85),Off=Color3.fromRGB(48,54,67),OffBorder=Color3.fromRGB(84,94,113),PanelAlpha=0,WindowAlpha=0},
- Transparent={Window=Color3.fromRGB(217,217,217),Panel=White,Hover=Gray,Text=Black,Muted=Color3.fromRGB(83,88,99),Border=Color3.fromRGB(193,199,211),Off=Color3.fromRGB(233,237,243),OffBorder=Color3.fromRGB(191,200,216),PanelAlpha=0.30,WindowAlpha=0.55},
+ Transparent={Window=Color3.fromRGB(114,111,118),Panel=Color3.fromRGB(170,168,177),Hover=Color3.fromRGB(199,197,207),Text=Color3.fromRGB(250,249,253),Muted=Color3.fromRGB(216,213,225),Border=Color3.fromRGB(222,219,232),Off=Color3.fromRGB(133,132,145),OffBorder=Color3.fromRGB(194,192,209),PanelAlpha=0.75,WindowAlpha=0.50},
 }
 local theme=themes.White
 local paintEntries,animatedProps={},{}
@@ -271,7 +271,12 @@ local function dropdown(parent,id,name,y,options,initial,callback)
  make("UIStroke",{Color=Line,Thickness=1},b)
  b.TextXAlignment=Enum.TextXAlignment.Left
  make("UIPadding",{PaddingLeft=UDim.new(0,12),PaddingRight=UDim.new(0,28)},b)
- label(b,"Chevron","⌄",b.Size.X.Offset-26,0,20,32,16,Muted)
+ local arrow=frame(b,"Chevron",b.Size.X.Offset-24,13,8,5)
+ for i,angle in ipairs({45,-45}) do
+  local mark=frame(arrow,"Line"..i,i==1 and 0 or 4,1,5,1.4,Muted,1)
+  mark.Rotation=angle
+  table.insert(paintEntries,{Object=mark,Property="BackgroundColor3",Role="Muted"}) mark.BackgroundColor3=theme.Muted
+ end
  local list=frame(gui,id.."Options",0,0,300,#options*32+8,White,8)
  list.Visible=false list.ZIndex=200
  make("UIStroke",{Color=Line,Thickness=1},list)
@@ -509,6 +514,7 @@ function api:Page(options)
  end
  api.PageObjects[name]=page
  if not api.State.Tab then api.SelectTab(name,true) end
+ if api.State.Theme=="Transparent" then api:SetTheme("Transparent") end
  return page
 end
 function api:SetScale(value) assert(type(value)=="number" and value>0) uiScale=value fit() return self end
@@ -519,7 +525,7 @@ function api:SetTheme(name)
  theme=themes[name] api.State.Theme=name
  for _,entry in ipairs(paintEntries) do
   local o=entry.Object
-  if o.Parent then
+  if o.Parent and not o:GetAttribute("FixedTheme") then
    local props=animatedProps[o]
    if tweens[o] and props and (props.BackgroundColor3 or props.TextColor3 or props.Color) then tweens[o]:Cancel() end
    o[entry.Property]=theme[entry.Role]
@@ -529,6 +535,13 @@ function api:SetTheme(name)
   end
  end
  for id,c in pairs(bindings) do c.Set(api.State[id],true) end
+ local glassTargets={root}
+ for _,p in pairs(pages) do table.insert(glassTargets,p.LeftPanel) table.insert(glassTargets,p.RightPanel) end
+ for _,o in ipairs(glassTargets) do
+  local edge=o:FindFirstChild("GlassOutline")
+  if not edge then edge=make("UIStroke",{Name="GlassOutline",Color=White,Thickness=1,Transparency=0.5,ApplyStrokeMode=Enum.ApplyStrokeMode.Border},o) end
+  edge.Enabled=name=="Transparent"
+ end
  refreshTabs()
  if self.SettingsThemeControl and self.SettingsThemeControl:Get()~=name then self.SettingsThemeControl:Set(name,true) end
  return self
@@ -542,7 +555,7 @@ end
 function api:GetToggleKey() return Config.ToggleKey end
 function api:CaptureUIKey()
  cancelCapture() pendingUIKey=true
- if uiKeyBadge then uiKeyBadge.Text="Press any key…" end
+ if uiKeyBadge then uiKeyBadge.Text="Press key…" end
 end
 function api:AddSettingsPage(opts)
  if self.SettingsPage then return self.SettingsPage end
@@ -550,12 +563,16 @@ function api:AddSettingsPage(opts)
  local page=self:Page({Name=opts.Name or "Settings"})
  local appearance=page:Section({Name="Theme",Side="Left",Description="Choose the appearance of your interface"})
  self.SettingsThemeControl=appearance:Dropdown({Name="Theme",Options={"White","Dark","Transparent"},Default=api.State.Theme or "White",Callback=function(value) self:SetTheme(value) end})
- appearance:Label({Text="Transparent makes the window and panels translucent.",Height=50})
- local input=page:Section({Name="UI keybind",Side="Right",Description="Choose a key to show or hide this window"})
- local key=input:Button({Name=Config.ToggleKey.Name,Callback=function() self:CaptureUIKey() end})
- uiKeyBadge=key.Instance self.SettingsKeyControl=key
- input:Label({Text="Click the key button, then press a keyboard key. The UI key takes priority if a toggle uses the same key.",Height=70})
- input:Button({Name="Reset to RightShift",Callback=function() cancelCapture() self:SetToggleKey(Enum.KeyCode.RightShift) end})
+ local panel=page.Instance.RightPanel
+ label(panel,"UIKeyLabel","Ui keybind",8,413,76,28,14)
+ local b=button(panel,"UIKey",Config.ToggleKey.Name,84,414,46,26,false)
+ b.AutomaticSize=Enum.AutomaticSize.X
+ make("UIPadding",{PaddingLeft=UDim.new(0,9),PaddingRight=UDim.new(0,9)},b)
+ b:SetAttribute("FixedTheme",true) b.BackgroundColor3=White b.BackgroundTransparency=0 b.TextColor3=Black
+ make("UIStroke",{Color=Color3.fromRGB(210,210,216),Thickness=0.6},b)
+ local key={Instance=b,Fire=function() self:CaptureUIKey() end}
+ on(b.MouseButton1Click,function() self:CaptureUIKey() end)
+ uiKeyBadge=b self.SettingsKeyControl=key
  self.SettingsPage=page
  self:SetTheme(api.State.Theme or "White") self:SetToggleKey(Config.ToggleKey)
  return page
